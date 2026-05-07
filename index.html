@@ -99,19 +99,11 @@
 
         function obtenirPosition(txt, photoData) {
             const gpsOptions = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 };
-            
-            // "watchPosition" force Chrome à réveiller activement la puce GPS
             const watchId = navigator.geolocation.watchPosition((p) => {
-                navigator.geolocation.clearWatch(watchId); // On arrête dès qu'on a un signal
+                navigator.geolocation.clearWatch(watchId);
                 envoyer(txt, p.coords.latitude, p.coords.longitude, photoData);
             }, (err) => {
                 navigator.geolocation.clearWatch(watchId);
-                // Secours réseau immédiat si le satellite est bloqué
-                navigator.geolocation.getCurrentPosition((p2) => {
-                    envoyer(txt, p2.coords.latitude, p2.coords.longitude, photoData);
-                }, () => {
-                    alert("ERREUR CHROME : Veuillez autoriser la position dans les réglages du cadenas en haut à gauche.");
-                }, { enableHighAccuracy: false });
             }, gpsOptions);
         }
 
