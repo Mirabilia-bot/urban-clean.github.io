@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URBAN-CLEAN | Dashboard Lomé</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { 
+            font-family: "Times New Roman", Times, serif; 
+            margin: 0; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100vh; 
+            background-color: #f4f4f4; 
+        }
+        header { 
+            background: #1b5e20; 
+            color: white; 
+            padding: 1rem; 
+            text-align: center; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); 
+        }
+        main { 
+            display: flex; 
+            flex: 1; 
+            overflow: hidden; 
+        }
+        #sidebar { 
+            width: 300px; 
+            background: white; 
+            border-right: 1px solid #ccc; 
+            padding: 20px; 
+            overflow-y: auto; 
+        }
+        #map { 
+            flex: 1; 
+        }
+        .stat-card { 
+            background: #e8f5e9; 
+            padding: 15px; 
+            margin-bottom: 20px; 
+            border-radius: 5px; 
+            border-left: 5px solid #1b5e20; 
+        }
+        .alert-item { 
+            padding: 10px; 
+            border-bottom: 1px solid #eee; 
+            font-size: 0.85em; 
+        }
+        h2 { color: #1b5e20; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>URBAN-CLEAN : Observatoire de la Salubrité de Lomé</h1>
+</header>
+
+<main>
+    <div id="sidebar">
+        <h2>Tableau de Bord</h2>
+        <div class="stat-card">
+            <strong>Indicateur Temps Réel</strong>
+            <p id="stats-summary">Initialisation du SIG...</p>
+        </div>
+        <h3>Signalements récents</h3>
+        <div id="alert-list">Recherche de données...</div>
+        <p style="margin-top: 30px; font-size: 0.7em; color: gray;">
+            Expert SIG : Gnimdou <br>
+            Propulsé par Firebase & GitHub Pages
+        </p>
+    </div>
+    <div id="map"></div>
+</main>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // Configuration officielle UrbanCleanLome
+    const firebaseConfig = {
+      apiKey: "AIzaSyC1jpzpQRyEAn5sP6ojhasBRwZAMt5L_p4",
+      authDomain: "urbancleanlome.firebaseapp.com",
+      projectId: "urbancleanlome",
+      storageBucket: "urbancleanlome.firebasestorage.app",
+      messagingSenderId: "196173923360",
+      appId: "1:196173923360:web:5e3d6935c95d6c96822845",
+      measurementId: "G-ELH5NEPB58"
+    };
+
+    // Initialisation
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Initialisation de la carte centrée sur Lomé
+    var map = L.map('map').setView([6.1319, 1.2228], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Écoute en temps réel de la collection "signalements"
+    const alertsCol = collection(db, "signalements");
+    
+    onSnapshot(alertsCol, (snapshot) => {
+        const alertList = document.getElementById('alert-list');
+        const statsSummary = document.getElementById('stats-summary');
+        alertList.innerHTML = "";
+        let count = 0;
+
+        // Nettoyage des anciens marqueurs si nécessaire
+        // (Pour ce test, on ajoute simplement les nouveaux)
+
+        snapshot.forEach((doc) => {
+            const data = doc.data();
+            count++;
+            
+            if (data.latitude && data.longitude) {
+                const marker = L.marker([data.latitude, data.longitude]).addTo(map);
+                marker.bindPopup(`<b>Alerte #${count}</b><br>${data.description || 'Insalubrité'}`);
+            }
+
+            const div = document.createElement('div');
+            div.className = 'alert-item';
+            div.innerHTML = `<b>#${count}</b> - ${data.description || 'Lieu non décrit'}<br><small>GPS: ${data.latitude}, ${data.longitude}</small>`;
+            alertList.appendChild(div);
+        });
+
+        statsSummary.innerHTML = `<strong>${count}</strong> zone(s) identifiée(s) à Lomé.`;
+        if(count === 0) alertList.innerHTML = "Aucun signalement en base.";
+    }, (error) => {
+        console.error("Erreur Firebase:", error);
+        document.getElementById('stats-summary').innerHTML = "Erreur de connexion aux règles Firebase.";
+    });
+</script>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+</body>
+  </html>
+  
