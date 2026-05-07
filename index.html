@@ -18,6 +18,7 @@
         .actions { display: flex; gap: 20px; align-items: center; }
         .fa-trash { color: #d32f2f; cursor: pointer; }
         .fa-edit { color: #f57c00; cursor: pointer; }
+        .thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px; border: 1px solid #ddd; }
     </style>
 </head>
 <body>
@@ -25,6 +26,7 @@
     <div id="map"></div>
     <div id="panel">
         <button class="btn-alert" onclick="lancerSignalement()">🚨 SIGNALER UNE URGENCE D'INSALUBRITÉ</button>
+        <input type="file" id="photoInput" style="display:none" accept="image/*" capture="environment">
         <div id="feed">Chargement des flux satellites...</div>
     </div>
 
@@ -58,11 +60,17 @@
                 const d = doc.data();
                 const id = doc.id;
                 if(d.latitude && d.longitude) {
-                    markerPool[id] = L.marker([d.latitude, d.longitude]).addTo(map).bindPopup(d.description);
+                    let popupContent = `<b>${d.description}</b>`;
+                    if(d.photo) popupContent += `<br><img src="${d.photo}" style="width:150px;margin-top:5px;border-radius:4px">`;
+                    
+                    markerPool[id] = L.marker([d.latitude, d.longitude]).addTo(map).bindPopup(popupContent);
                     const isMine = (d.userId === myKey);
                     feed.innerHTML += `
                         <div class="data-card">
-                            <div style="flex:1"><strong>${d.description}</strong><br><small>Coord: ${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}</small></div>
+                            <div style="display:flex;align-items:center;flex:1">
+                                ${d.photo ? `<img src="${d.photo}" class="thumb">` : ''}
+                                <div><strong>${d.description}</strong><br><small>Coord: ${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}</small></div>
+                            </div>
                             <div class="actions">
                                 ${isMine ? `<i class="fas fa-edit" onclick="editer('${id}', '${d.description}')"></i>
                                            <i class="fas fa-trash" onclick="supprimer('${id}')"></i>` : ''}
@@ -76,23 +84,36 @@
             const txt = prompt("Nature de l'urgence d'assainissement :");
             if(!txt) return;
 
-            // STRATÉGIE GPS NASA : Tente la haute précision, sinon bascule sur la basse précision
-            navigator.geolocation.getCurrentPosition((p) => {
-                envoyer(txt, p.coords.latitude, p.coords.longitude);
-            }, (err) => {
-                // Deuxième chance : basse précision (plus rapide, évite l'erreur de 100km)
-                navigator.geolocation.getCurrentPosition((p2) => {
-                    envoyer(txt + " (Précision Réseau)", p2.coords.latitude, p2.coords.longitude);
-                }, () => {
-                    alert("Erreur GPS critique. Vérifiez vos réglages Android.");
-                }, { enableHighAccuracy: false, timeout: 5000 });
-            }, { enableHighAccuracy: true, timeout: 10000 });
+            const photoInput = document.getElementById('photoInput');
+            photoInput.onchange = e => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const base64Photo = reader.result;
+                    obtenirPosition(txt, base64Photo);
+                };
+                if(file) reader.readAsDataURL(file); else obtenirPosition(txt, null);
+            };
+            photoInput.click();
         }
 
-        function envoyer(desc, lat, lng) {
+        function obtenirPosition(txt, photoData) {
+            const gpsOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
+            navigator.geolocation.getCurrentPosition((p) => {
+                envoyer(txt, p.coords.latitude, p.coords.longitude, photoData);
+            }, (err) => {
+                navigator.geolocation.getCurrentPosition((p2) => {
+                    envoyer(txt + " (Précision Réseau)", p2.coords.latitude, p2.coords.longitude, photoData);
+                }, () => {
+                    alert("ERREUR CHROME : Veuillez autoriser la position dans les réglages du cadenas en haut à gauche.");
+                }, { enableHighAccuracy: false });
+            }, gpsOptions);
+        }
+
+        function envoyer(desc, lat, lng, photo) {
             db.collection("signalements").add({
                 description: desc, latitude: lat, longitude: lng,
-                userId: myKey, timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                photo: photo, userId: myKey, timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
         }
 
