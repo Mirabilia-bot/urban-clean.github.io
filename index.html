@@ -3,27 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>URBAN-CLEAN | International Innovation</title>
+    <title>URBAN-CLEAN | Excellence SIG</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <style>
-        :root { --primary: #1b5e20; --accent: #d32f2f; --bg: #f8f9fa; }
-        body { font-family: 'Times New Roman', serif; margin: 0; background: var(--bg); overflow: hidden; }
+        :root { --primary: #1b5e20; --accent: #d32f2f; --edit: #f57c00; --bg: #ffffff; }
+        body { font-family: 'Times New Roman', serif; margin: 0; background: var(--bg); overflow: hidden; height: 100vh; }
+        
         #app-container { display: flex; flex-direction: column; height: 100vh; }
         
-        header { background: var(--primary); color: white; padding: 15px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; }
-        header h1 { margin: 0; font-size: 1.2rem; text-transform: uppercase; letter-spacing: 1px; }
+        header { background: var(--primary); color: white; padding: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 2000; }
+        header h1 { margin: 0; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; }
 
-        #map { flex: 1; width: 100%; background: #e0e0e0; z-index: 1; }
+        #map { flex: 1; width: 100%; z-index: 1; }
 
-        #dashboard { background: white; padding: 20px; border-top-left-radius: 20px; border-top-right-radius: 20px; box-shadow: 0 -5px 20px rgba(0,0,0,0.1); z-index: 1000; position: relative; }
+        #dashboard { 
+            background: white; 
+            height: 35vh; 
+            display: flex;
+            flex-direction: column;
+            border-top: 4px solid var(--primary);
+            z-index: 2000;
+            padding: 10px;
+            box-sizing: border-box;
+        }
         
-        .btn-action { background: var(--accent); color: white; border: none; padding: 16px; width: 100%; border-radius: 12px; font-weight: bold; font-size: 1rem; cursor: pointer; transition: 0.3s; box-shadow: 0 4px 10px rgba(211, 47, 47, 0.3); }
-        .btn-action:active { transform: scale(0.98); }
-
-        .stats-box { display: flex; justify-content: space-between; align-items: center; background: #f1f8e9; padding: 12px 18px; border-radius: 10px; margin-top: 15px; border-left: 4px solid var(--primary); }
-        .count { font-size: 1.4rem; color: var(--primary); font-weight: bold; }
+        .action-area { display: flex; gap: 10px; margin-bottom: 10px; }
+        .btn-signal { flex: 2; background: var(--accent); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.9rem; }
         
-        #feed { max-height: 80px; overflow-y: auto; margin-top: 15px; font-size: 0.85rem; color: #555; }
+        .stats-badge { flex: 1; background: #e8f5e9; border: 1px solid var(--primary); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.8rem; }
+        .stats-badge strong { font-size: 1.2rem; color: var(--primary); }
+
+        #feed-container { flex: 1; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; }
+        .data-item { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 10px; 
+            border-bottom: 1px solid #f0f0f0; 
+            font-size: 0.85rem;
+        }
+        .data-info { flex: 1; }
+        .data-actions { display: flex; gap: 12px; margin-left: 10px; }
+        .icon-btn { cursor: pointer; font-size: 1.1rem; transition: 0.2s; }
+        .icon-edit { color: var(--edit); }
+        .icon-delete { color: var(--accent); }
     </style>
 </head>
 <body>
@@ -34,19 +58,25 @@
     <div id="map"></div>
 
     <div id="dashboard">
-        <button class="btn-action" onclick="signaler()">🚨 SIGNALER UNE URGENCE SANITAIRE</button>
-        
-        <div class="stats-box">
-            <span>Points de vigilance identifiés :</span>
-            <span class="count" id="point-counter">0</span>
+        <div class="action-area">
+            <button class="btn-signal" onclick="localiserEtSignaler()">
+                <i class="fa-solid fa-location-dot"></i> SIGNALER ICI
+            </button>
+            <div class="stats-badge">
+                <span>Points</span>
+                <strong id="counter">0</strong>
+            </div>
         </div>
-        <div id="feed">Initialisation du flux satellite...</div>
+
+        <div id="feed-container">
+            <div id="feed-content">Initialisation du flux...</div>
+        </div>
     </div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, updateDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyC1jpzpQRyEAn5sP6ojhasBRwZAMt5L_p4",
@@ -59,60 +89,96 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const colRef = collection(db, "signalements");
 
-    // Initialisation de la carte avec un style "Voyager" (plus pro)
+    // Carte OpenStreetMap Standard (Couleurs)
     var map = L.map('map', { zoomControl: false }).setView([6.1319, 1.2228], 14);
-    
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; CartoDB'
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    // CORRECTIF MAGIQUE : Force le rendu de la carte après le chargement du DOM
-    window.addEventListener('load', () => {
-        setTimeout(() => { 
-            map.invalidateSize(true);
-            console.log("SIG Rendu optimisé");
-        }, 800);
-    });
+    // Forcer le rendu propre de la carte
+    setTimeout(() => { map.invalidateSize(); }, 500);
 
-    const markers = [];
+    let activeMarkers = {};
 
-    onSnapshot(collection(db, "signalements"), (snapshot) => {
-        const feed = document.getElementById('feed');
-        const counter = document.getElementById('point-counter');
+    // Lecture et mise à jour automatique de l'interface
+    onSnapshot(colRef, (snapshot) => {
+        const feed = document.getElementById('feed-content');
+        const counter = document.getElementById('counter');
         feed.innerHTML = "";
-        let count = 0;
+        
+        // Nettoyer les marqueurs existants
+        Object.values(activeMarkers).forEach(m => map.removeLayer(m));
+        activeMarkers = {};
 
-        snapshot.forEach((doc) => {
-            const data = doc.data();
+        let count = 0;
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            const id = docSnap.id;
             const lat = parseFloat(data.latitude);
             const lng = parseFloat(data.longitude);
-            
+
             if (!isNaN(lat) && !isNaN(lng)) {
                 count++;
-                L.marker([lat, lng]).addTo(map)
-                 .bindPopup(`<b>Alerte Sanitaire</b><br>${data.description || 'Déchet non identifié'}`);
-                
-                const entry = document.createElement('div');
-                entry.innerHTML = `• ${data.description || 'Signalement'} (Lomé)`;
-                feed.prepend(entry);
+                const marker = L.marker([lat, lng]).addTo(map).bindPopup(`<b>${data.description}</b>`);
+                activeMarkers[id] = marker;
+
+                const item = document.createElement('div');
+                item.className = 'data-item';
+                item.innerHTML = `
+                    <div class="data-info">
+                        <strong>${data.description}</strong><br>
+                        <small>${lat.toFixed(4)}, ${lng.toFixed(4)}</small>
+                    </div>
+                    <div class="data-actions">
+                        <i class="fa-solid fa-pen-to-square icon-btn icon-edit" onclick="modifier('${id}', '${data.description}')"></i>
+                        <i class="fa-solid fa-trash-can icon-btn icon-delete" onclick="supprimer('${id}')"></i>
+                    </div>
+                `;
+                feed.prepend(item);
             }
         });
         counter.innerText = count;
     });
 
-    window.signaler = function() {
+    // CRÉER (Optimisé pour Chrome)
+    window.localiserEtSignaler = function() {
+        if (!navigator.geolocation) return alert("Géolocalisation non supportée.");
+
         navigator.geolocation.getCurrentPosition(async (pos) => {
-            const label = prompt("Type d'insalubrité (ex: Dépôt sauvage, Canal bouché) :");
+            const label = prompt("Type d'insalubrité constaté :");
             if (!label) return;
-            await addDoc(collection(db, "signalements"), {
-                description: label,
-                latitude: pos.coords.latitude,
-                longitude: pos.coords.longitude,
-                timestamp: serverTimestamp()
-            });
-        }, () => alert("Activez le GPS pour la précision SIG."), { enableHighAccuracy: true });
+            try {
+                await addDoc(colRef, {
+                    description: label,
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                    timestamp: serverTimestamp()
+                });
+            } catch (e) { alert("Erreur de connexion."); }
+        }, (err) => {
+            alert("Erreur Chrome : Vérifiez les permissions de localisation.");
+        }, { enableHighAccuracy: true });
     };
+
+    // SUPPRIMER
+    window.supprimer = async function(id) {
+        if (confirm("Supprimer définitivement ce point SIG ?")) {
+            await deleteDoc(doc(db, "signalements", id));
+        }
+    };
+
+    // MODIFIER
+    window.modifier = async function(id, oldDesc) {
+        const newDesc = prompt("Modifier la description :", oldDesc);
+        if (newDesc && newDesc !== oldDesc) {
+            await updateDoc(doc(db, "signalements", id), {
+                description: newDesc
+            });
+        }
+    };
+
 </script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
