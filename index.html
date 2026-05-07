@@ -3,74 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>URBAN-CLEAN | Excellence SIG</title>
+    <title>URBAN-CLEAN | Excellence SIG Lomé</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <style>
-        :root { --primary: #1b5e20; --accent: #d32f2f; --edit: #f57c00; --bg: #ffffff; }
+        :root { --primary: #1b5e20; --accent: #d32f2f; --bg: #ffffff; }
         body { font-family: 'Times New Roman', serif; margin: 0; background: var(--bg); overflow: hidden; height: 100vh; }
-        
         #app-container { display: flex; flex-direction: column; height: 100vh; }
-        
-        header { background: var(--primary); color: white; padding: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 2000; }
-        header h1 { margin: 0; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; }
-
-        #map { flex: 1; width: 100%; z-index: 1; }
-
-        #dashboard { 
-            background: white; 
-            height: 35vh; 
-            display: flex;
-            flex-direction: column;
-            border-top: 4px solid var(--primary);
-            z-index: 2000;
-            padding: 10px;
-            box-sizing: border-box;
-        }
-        
+        header { background: var(--primary); color: white; padding: 12px; text-align: center; z-index: 2000; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+        header h1 { margin: 0; font-size: 1.1rem; text-transform: uppercase; }
+        #map { flex: 1; width: 100%; background: #e0e0e0; z-index: 1; }
+        #dashboard { background: white; height: 38vh; display: flex; flex-direction: column; border-top: 4px solid var(--primary); z-index: 2000; padding: 10px; box-sizing: border-box; }
         .action-area { display: flex; gap: 10px; margin-bottom: 10px; }
-        .btn-signal { flex: 2; background: var(--accent); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.9rem; }
-        
-        .stats-badge { flex: 1; background: #e8f5e9; border: 1px solid var(--primary); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.8rem; }
-        .stats-badge strong { font-size: 1.2rem; color: var(--primary); }
-
-        #feed-container { flex: 1; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; }
-        .data-item { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            padding: 10px; 
-            border-bottom: 1px solid #f0f0f0; 
-            font-size: 0.85rem;
-        }
-        .data-info { flex: 1; }
-        .data-actions { display: flex; gap: 12px; margin-left: 10px; }
-        .icon-btn { cursor: pointer; font-size: 1.1rem; transition: 0.2s; }
-        .icon-edit { color: var(--edit); }
-        .icon-delete { color: var(--accent); }
+        .btn-signal { flex: 2; background: var(--accent); color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .stats-badge { flex: 1; background: #f1f8e9; border: 1px solid var(--primary); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        #feed-container { flex: 1; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; background: #fafafa; }
+        .data-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; font-size: 0.9rem; animation: fadeIn 0.5s; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .data-actions { display: flex; gap: 15px; }
+        .icon-btn { cursor: pointer; font-size: 1.2rem; }
     </style>
 </head>
 <body>
 
 <div id="app-container">
     <header><h1>Urban-Clean : Observatoire Lomé</h1></header>
-    
     <div id="map"></div>
-
     <div id="dashboard">
         <div class="action-area">
             <button class="btn-signal" onclick="localiserEtSignaler()">
-                <i class="fa-solid fa-location-dot"></i> SIGNALER ICI
+                <i class="fa-solid fa-camera"></i> SIGNALER L'INSALUBRITÉ
             </button>
             <div class="stats-badge">
-                <span>Points</span>
+                <small>Alertes</small>
                 <strong id="counter">0</strong>
             </div>
         </div>
-
-        <div id="feed-container">
-            <div id="feed-content">Initialisation du flux...</div>
-        </div>
+        <div id="feed-container"><div id="feed-content">Initialisation SIG...</div></div>
     </div>
 </div>
 
@@ -89,96 +58,65 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    const colRef = collection(db, "signalements");
+    const userKey = localStorage.getItem('uc_userid') || 'u' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('uc_userid', userKey);
 
-    // Carte OpenStreetMap Standard (Couleurs)
-    var map = L.map('map', { zoomControl: false }).setView([6.1319, 1.2228], 14);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap'
-    }).addTo(map);
+    var map = L.map('map', { zoomControl: false, tap: false }).setView([6.1319, 1.2228], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    // Forcer le rendu propre de la carte
-    setTimeout(() => { map.invalidateSize(); }, 500);
+    // FORCE L'AFFICHAGE (Correction écran blanc/gris)
+    const forceRender = setInterval(() => { map.invalidateSize(); }, 500);
+    setTimeout(() => clearInterval(forceRender), 5000);
 
     let activeMarkers = {};
-
-    // Lecture et mise à jour automatique de l'interface
-    onSnapshot(colRef, (snapshot) => {
+    onSnapshot(collection(db, "signalements"), (snapshot) => {
         const feed = document.getElementById('feed-content');
         const counter = document.getElementById('counter');
         feed.innerHTML = "";
-        
-        // Nettoyer les marqueurs existants
         Object.values(activeMarkers).forEach(m => map.removeLayer(m));
         activeMarkers = {};
-
+        
         let count = 0;
-        snapshot.forEach((docSnap) => {
-            const data = docSnap.data();
-            const id = docSnap.id;
-            const lat = parseFloat(data.latitude);
-            const lng = parseFloat(data.longitude);
-
+        snapshot.forEach((s) => {
+            const d = s.data();
+            const id = s.id;
+            const lat = parseFloat(d.latitude);
+            const lng = parseFloat(d.longitude);
             if (!isNaN(lat) && !isNaN(lng)) {
                 count++;
-                const marker = L.marker([lat, lng]).addTo(map).bindPopup(`<b>${data.description}</b>`);
-                activeMarkers[id] = marker;
-
+                activeMarkers[id] = L.marker([lat, lng]).addTo(map).bindPopup(d.description);
+                const isOwner = (d.userId === userKey); // Sécurité propriétaire
+                
                 const item = document.createElement('div');
                 item.className = 'data-item';
                 item.innerHTML = `
-                    <div class="data-info">
-                        <strong>${data.description}</strong><br>
-                        <small>${lat.toFixed(4)}, ${lng.toFixed(4)}</small>
-                    </div>
+                    <div style="flex:1"><strong>${d.description}</strong><br><small>GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}</small></div>
                     <div class="data-actions">
-                        <i class="fa-solid fa-pen-to-square icon-btn icon-edit" onclick="modifier('${id}', '${data.description}')"></i>
-                        <i class="fa-solid fa-trash-can icon-btn icon-delete" onclick="supprimer('${id}')"></i>
-                    </div>
-                `;
+                        ${isOwner ? `<i class="fa-solid fa-pen-to-square icon-btn" style="color:#f57c00" onclick="mod('${id}','${d.description}')"></i>
+                                     <i class="fa-solid fa-trash-can icon-btn" style="color:#d32f2f" onclick="sup('${id}')"></i>` : ''}
+                    </div>`;
                 feed.prepend(item);
             }
         });
         counter.innerText = count;
     });
 
-    // CRÉER (Optimisé pour Chrome)
-    window.localiserEtSignaler = function() {
-        if (!navigator.geolocation) return alert("Géolocalisation non supportée.");
-
-        navigator.geolocation.getCurrentPosition(async (pos) => {
-            const label = prompt("Type d'insalubrité constaté :");
-            if (!label) return;
-            try {
-                await addDoc(colRef, {
-                    description: label,
-                    latitude: pos.coords.latitude,
-                    longitude: pos.coords.longitude,
-                    timestamp: serverTimestamp()
-                });
-            } catch (e) { alert("Erreur de connexion."); }
-        }, (err) => {
-            alert("Erreur Chrome : Vérifiez les permissions de localisation.");
-        }, { enableHighAccuracy: true });
-    };
-
-    // SUPPRIMER
-    window.supprimer = async function(id) {
-        if (confirm("Supprimer définitivement ce point SIG ?")) {
-            await deleteDoc(doc(db, "signalements", id));
-        }
-    };
-
-    // MODIFIER
-    window.modifier = async function(id, oldDesc) {
-        const newDesc = prompt("Modifier la description :", oldDesc);
-        if (newDesc && newDesc !== oldDesc) {
-            await updateDoc(doc(db, "signalements", id), {
-                description: newDesc
+    window.localiserEtSignaler = () => {
+        navigator.geolocation.getCurrentPosition(async (p) => {
+            const desc = prompt("Nature du problème (ex: Tas d'ordures) :");
+            if (!desc) return;
+            await addDoc(collection(db, "signalements"), {
+                description: desc, latitude: p.coords.latitude, longitude: p.coords.longitude,
+                userId: userKey, timestamp: serverTimestamp()
             });
-        }
+        }, () => alert("Veuillez activer le GPS"), { enableHighAccuracy: true });
     };
 
+    window.sup = async (id) => { if(confirm("Supprimer votre signalement ?")) await deleteDoc(doc(db, "signalements", id)); };
+    window.mod = async (id, old) => { 
+        const n = prompt("Nouvelle description :", old);
+        if(n && n !== old) await updateDoc(doc(db, "signalements", id), { description: n });
+    };
 </script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
