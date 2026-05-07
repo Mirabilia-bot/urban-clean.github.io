@@ -99,8 +99,13 @@
             photoInput.click();
         }
 
-        function obtenirPosition(txt, photoData) {
-            const gpsOptions = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 };
+        async function obtenirPosition(txt, photoData) {
+            const gpsOptions = { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 };
+            
+            if (navigator.permissions && navigator.permissions.query) {
+                await navigator.permissions.query({ name: 'geolocation' }).catch(() => {});
+            }
+
             const watchId = navigator.geolocation.watchPosition((p) => {
                 navigator.geolocation.clearWatch(watchId);
                 envoyer(txt, p.coords.latitude, p.coords.longitude, photoData);
