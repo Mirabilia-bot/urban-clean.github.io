@@ -3,131 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>URBAN-CLEAN | STRATOS SIG</title>
+    <title>URBAN-CLEAN | GEOPORTAIL LOMÉ</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        :root { --nasa-blue: #0b3d91; --nasa-red: #fc3d21; --safety-green: #1b5e20; }
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Times New Roman', serif; overflow: hidden; background: #000; }
-        
-        #mission-control { display: flex; flex-direction: column; height: 100vh; background: #fff; }
-        header { background: var(--safety-green); color: white; padding: 15px; text-align: center; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); z-index: 9999; }
-        
-        #map { flex: 1; width: 100%; height: 100%; background: #222; }
-
-        #data-panel { 
-            height: 40vh; background: #ffffff; border-top: 5px solid var(--safety-green); 
-            display: flex; flex-direction: column; z-index: 9999; padding: 15px; box-sizing: border-box;
-        }
-
-        .btn-launch { 
-            background: var(--nasa-red); color: white; border: none; padding: 18px; 
-            border-radius: 12px; font-weight: bold; font-size: 1.1rem; width: 100%;
-            box-shadow: 0 6px 20px rgba(252, 61, 33, 0.4); cursor: pointer;
-        }
-
-        #telemetry-feed { flex: 1; overflow-y: auto; margin-top: 15px; border: 1px solid #ddd; border-radius: 10px; background: #f9f9f9; }
-        .log-entry { 
-            display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #eee; 
-            font-size: 0.9rem; border-left: 5px solid var(--safety-green); margin: 5px; background: white;
-        }
-        .admin-tools { display: flex; gap: 15px; }
-        .stat-hub { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; color: var(--safety-green); }
+        body, html { margin: 0; padding: 0; height: 100%; font-family: 'Times New Roman', serif; }
+        #map { height: 60vh; width: 100%; background: #ccc; }
+        #panel { height: 40vh; background: white; border-top: 4px solid #1b5e20; padding: 15px; box-sizing: border-box; overflow-y: auto; }
+        .header { background: #1b5e20; color: white; padding: 10px; text-align: center; font-weight: bold; }
+        .btn { background: #fc3d21; color: white; border: none; padding: 15px; width: 100%; border-radius: 8px; font-weight: bold; margin-bottom: 10px; }
+        .item { padding: 10px; border-bottom: 1px solid #eee; font-size: 0.9em; }
     </style>
 </head>
 <body>
-
-<div id="mission-control">
-    <header>Urban-Clean : Observatoire Lomé (V.NASA)</header>
+    <div class="header">URBAN-CLEAN : EXPERT SIG GNIMDOU</div>
     <div id="map"></div>
-    <div id="data-panel">
-        <div class="stat-hub">
-            <span>STATUT : OPÉRATIONNEL</span>
-            <span>ALERTES : <span id="count-hex">0</span></span>
-        </div>
-        <button class="btn-launch" onclick="initiateSignal()">🚨 SIGNALER UNE ANOMALIE</button>
-        <div id="telemetry-feed"></div>
+    <div id="panel">
+        <button class="btn" onclick="signalerAction()">📍 SIGNALER UNE ANOMALIE</button>
+        <div id="logs">Chargement des données satellites...</div>
     </div>
-</div>
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyC1jpzpQRyEAn5sP6ojhasBRwZAMt5L_p4",
-      authDomain: "urbancleanlome.firebaseapp.com",
-      projectId: "urbancleanlome",
-      storageBucket: "urbancleanlome.firebasestorage.app",
-      messagingSenderId: "196173923360",
-      appId: "1:196173923360:web:5e3d6935c95d6c96822845"
-    };
+    <script>
+        // Configuration identique à votre projet
+        const firebaseConfig = {
+            apiKey: "AIzaSyC1jpzpQRyEAn5sP6ojhasBRwZAMt5L_p4",
+            authDomain: "urbancleanlome.firebaseapp.com",
+            projectId: "urbancleanlome",
+            appId: "1:196173923360:web:5e3d6935c95d6c96822845"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const uID = localStorage.getItem('nasa_id') || 'NASA-' + Math.random().toString(36).toUpperCase().substr(2, 6);
-    localStorage.setItem('nasa_id', uID);
+        // Initialisation Carte (Standard Géoportail)
+        var map = L.map('map').setView([6.1319, 1.2228], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    // Initialisation robuste de la carte
-    let map;
-    function bootMap() {
-        if (map) map.remove();
-        map = L.map('map', { zoomControl: false, fadeAnimation: false }).setView([6.1319, 1.2228], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'SIG NASA/OSM' }).addTo(map);
-        
-        // Force le rendu immédiat
-        setTimeout(() => map.invalidateSize(), 500);
-    }
-    bootMap();
-
-    const markers = {};
-    onSnapshot(collection(db, "signalements"), (snap) => {
-        const feed = document.getElementById('telemetry-feed');
-        const count = document.getElementById('count-hex');
-        feed.innerHTML = "";
-        let total = 0;
-
-        snap.forEach((sDoc) => {
-            const d = sDoc.data();
-            const id = sDoc.id;
-            if (d.latitude && d.longitude) {
-                total++;
-                if (!markers[id]) {
-                    markers[id] = L.marker([d.latitude, d.longitude]).addTo(map).bindPopup(d.description);
+        // Synchronisation Temps Réel
+        db.collection("signalements").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
+            const logs = document.getElementById('logs');
+            logs.innerHTML = "";
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                if(data.latitude && data.longitude) {
+                    L.marker([data.latitude, data.longitude]).addTo(map).bindPopup(data.description);
+                    logs.innerHTML += `<div class="item"><strong>${data.description}</strong><br>GPS: ${data.latitude.toFixed(4)}, ${data.longitude.toFixed(4)}</div>`;
                 }
-
-                const entry = document.createElement('div');
-                entry.className = 'log-entry';
-                const isMine = (d.userId === uID);
-                entry.innerHTML = `
-                    <div><strong>${d.description}</strong><br><small>LAT: ${d.latitude.toFixed(4)} | LON: ${d.longitude.toFixed(4)}</small></div>
-                    <div class="admin-tools">
-                        ${isMine ? `<i class="fas fa-trash" style="color:var(--nasa-red)" onclick="abort('${id}')"></i>` : ''}
-                    </div>`;
-                feed.prepend(entry);
-            }
-        });
-        count.innerText = total;
-        map.invalidateSize();
-    });
-
-    window.initiateSignal = () => {
-        navigator.geolocation.getCurrentPosition(async (p) => {
-            const msg = prompt("DESCRIPTION DE L'INSALUBRITÉ :");
-            if (!msg) return;
-            await addDoc(collection(db, "signalements"), {
-                description: msg, latitude: p.coords.latitude, longitude: p.coords.longitude,
-                userId: uID, timestamp: serverTimestamp()
             });
-        }, () => alert("GPS REQUIS"), { enableHighAccuracy: true });
-    };
+        });
 
-    window.abort = async (id) => {
-        if (confirm("CONFIRMER LA SUPPRESSION DU SIGNALEMENT ?")) {
-            await deleteDoc(doc(db, "signalements", id));
+        function signalerAction() {
+            const desc = prompt("Nature de l'insalubrité :");
+            if(!desc) return;
+            
+            navigator.geolocation.getCurrentPosition((pos) => {
+                db.collection("signalements").add({
+                    description: desc,
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }, () => {
+                alert("GPS bloqué. Utilisation de la position par défaut (Lomé Centre).");
+                db.collection("signalements").add({
+                    description: desc + " (Position approx.)",
+                    latitude: 6.1319,
+                    longitude: 1.2228,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            });
         }
-    };
-</script>
+        
+        // Correction forcée de la taille de la carte
+        setTimeout(() => { map.invalidateSize(); }, 1000);
+    </script>
 </body>
 </html>
