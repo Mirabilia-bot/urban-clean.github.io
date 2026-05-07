@@ -3,49 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>URBAN-CLEAN | Excellence SIG Lomé</title>
+    <title>URBAN-CLEAN | STRATOS SIG</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        :root { --primary: #1b5e20; --accent: #d32f2f; --bg: #ffffff; }
-        body { font-family: 'Times New Roman', serif; margin: 0; background: var(--bg); overflow: hidden; height: 100vh; }
-        #app-container { display: flex; flex-direction: column; height: 100vh; }
-        header { background: var(--primary); color: white; padding: 12px; text-align: center; z-index: 2000; box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
-        header h1 { margin: 0; font-size: 1.1rem; text-transform: uppercase; }
-        #map { flex: 1; width: 100%; background: #e0e0e0; z-index: 1; }
-        #dashboard { background: white; height: 38vh; display: flex; flex-direction: column; border-top: 4px solid var(--primary); z-index: 2000; padding: 10px; box-sizing: border-box; }
-        .action-area { display: flex; gap: 10px; margin-bottom: 10px; }
-        .btn-signal { flex: 2; background: var(--accent); color: white; border: none; padding: 15px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 1rem; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
-        .stats-badge { flex: 1; background: #f1f8e9; border: 1px solid var(--primary); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        #feed-container { flex: 1; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; background: #fafafa; }
-        .data-item { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; font-size: 0.9rem; animation: fadeIn 0.5s; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        .data-actions { display: flex; gap: 15px; }
-        .icon-btn { cursor: pointer; font-size: 1.2rem; }
+        :root { --nasa-blue: #0b3d91; --nasa-red: #fc3d21; --safety-green: #1b5e20; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: 'Times New Roman', serif; overflow: hidden; background: #000; }
+        
+        #mission-control { display: flex; flex-direction: column; height: 100vh; background: #fff; }
+        header { background: var(--safety-green); color: white; padding: 15px; text-align: center; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; box-shadow: 0 4px 15px rgba(0,0,0,0.4); z-index: 9999; }
+        
+        #map { flex: 1; width: 100%; height: 100%; background: #222; }
+
+        #data-panel { 
+            height: 40vh; background: #ffffff; border-top: 5px solid var(--safety-green); 
+            display: flex; flex-direction: column; z-index: 9999; padding: 15px; box-sizing: border-box;
+        }
+
+        .btn-launch { 
+            background: var(--nasa-red); color: white; border: none; padding: 18px; 
+            border-radius: 12px; font-weight: bold; font-size: 1.1rem; width: 100%;
+            box-shadow: 0 6px 20px rgba(252, 61, 33, 0.4); cursor: pointer;
+        }
+
+        #telemetry-feed { flex: 1; overflow-y: auto; margin-top: 15px; border: 1px solid #ddd; border-radius: 10px; background: #f9f9f9; }
+        .log-entry { 
+            display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid #eee; 
+            font-size: 0.9rem; border-left: 5px solid var(--safety-green); margin: 5px; background: white;
+        }
+        .admin-tools { display: flex; gap: 15px; }
+        .stat-hub { display: flex; justify-content: space-between; margin-bottom: 10px; font-weight: bold; color: var(--safety-green); }
     </style>
 </head>
 <body>
 
-<div id="app-container">
-    <header><h1>Urban-Clean : Observatoire Lomé</h1></header>
+<div id="mission-control">
+    <header>Urban-Clean : Observatoire Lomé (V.NASA)</header>
     <div id="map"></div>
-    <div id="dashboard">
-        <div class="action-area">
-            <button class="btn-signal" onclick="localiserEtSignaler()">
-                <i class="fa-solid fa-camera"></i> SIGNALER L'INSALUBRITÉ
-            </button>
-            <div class="stats-badge">
-                <small>Alertes</small>
-                <strong id="counter">0</strong>
-            </div>
+    <div id="data-panel">
+        <div class="stat-hub">
+            <span>STATUT : OPÉRATIONNEL</span>
+            <span>ALERTES : <span id="count-hex">0</span></span>
         </div>
-        <div id="feed-container"><div id="feed-content">Initialisation SIG...</div></div>
+        <button class="btn-launch" onclick="initiateSignal()">🚨 SIGNALER UNE ANOMALIE</button>
+        <div id="telemetry-feed"></div>
     </div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, updateDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, onSnapshot, addDoc, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyC1jpzpQRyEAn5sP6ojhasBRwZAMt5L_p4",
@@ -58,66 +66,68 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    const userKey = localStorage.getItem('uc_userid') || 'u' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('uc_userid', userKey);
+    const uID = localStorage.getItem('nasa_id') || 'NASA-' + Math.random().toString(36).toUpperCase().substr(2, 6);
+    localStorage.setItem('nasa_id', uID);
 
-    var map = L.map('map', { zoomControl: false, tap: false }).setView([6.1319, 1.2228], 14);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-    // FORCE L'AFFICHAGE (Correction écran blanc/gris)
-    const forceRender = setInterval(() => { map.invalidateSize(); }, 500);
-    setTimeout(() => clearInterval(forceRender), 5000);
-
-    let activeMarkers = {};
-    onSnapshot(collection(db, "signalements"), (snapshot) => {
-        const feed = document.getElementById('feed-content');
-        const counter = document.getElementById('counter');
-        feed.innerHTML = "";
-        Object.values(activeMarkers).forEach(m => map.removeLayer(m));
-        activeMarkers = {};
+    // Initialisation robuste de la carte
+    let map;
+    function bootMap() {
+        if (map) map.remove();
+        map = L.map('map', { zoomControl: false, fadeAnimation: false }).setView([6.1319, 1.2228], 14);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: 'SIG NASA/OSM' }).addTo(map);
         
-        let count = 0;
-        snapshot.forEach((s) => {
-            const d = s.data();
-            const id = s.id;
-            const lat = parseFloat(d.latitude);
-            const lng = parseFloat(d.longitude);
-            if (!isNaN(lat) && !isNaN(lng)) {
-                count++;
-                activeMarkers[id] = L.marker([lat, lng]).addTo(map).bindPopup(d.description);
-                const isOwner = (d.userId === userKey); // Sécurité propriétaire
-                
-                const item = document.createElement('div');
-                item.className = 'data-item';
-                item.innerHTML = `
-                    <div style="flex:1"><strong>${d.description}</strong><br><small>GPS: ${lat.toFixed(4)}, ${lng.toFixed(4)}</small></div>
-                    <div class="data-actions">
-                        ${isOwner ? `<i class="fa-solid fa-pen-to-square icon-btn" style="color:#f57c00" onclick="mod('${id}','${d.description}')"></i>
-                                     <i class="fa-solid fa-trash-can icon-btn" style="color:#d32f2f" onclick="sup('${id}')"></i>` : ''}
+        // Force le rendu immédiat
+        setTimeout(() => map.invalidateSize(), 500);
+    }
+    bootMap();
+
+    const markers = {};
+    onSnapshot(collection(db, "signalements"), (snap) => {
+        const feed = document.getElementById('telemetry-feed');
+        const count = document.getElementById('count-hex');
+        feed.innerHTML = "";
+        let total = 0;
+
+        snap.forEach((sDoc) => {
+            const d = sDoc.data();
+            const id = sDoc.id;
+            if (d.latitude && d.longitude) {
+                total++;
+                if (!markers[id]) {
+                    markers[id] = L.marker([d.latitude, d.longitude]).addTo(map).bindPopup(d.description);
+                }
+
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                const isMine = (d.userId === uID);
+                entry.innerHTML = `
+                    <div><strong>${d.description}</strong><br><small>LAT: ${d.latitude.toFixed(4)} | LON: ${d.longitude.toFixed(4)}</small></div>
+                    <div class="admin-tools">
+                        ${isMine ? `<i class="fas fa-trash" style="color:var(--nasa-red)" onclick="abort('${id}')"></i>` : ''}
                     </div>`;
-                feed.prepend(item);
+                feed.prepend(entry);
             }
         });
-        counter.innerText = count;
+        count.innerText = total;
+        map.invalidateSize();
     });
 
-    window.localiserEtSignaler = () => {
+    window.initiateSignal = () => {
         navigator.geolocation.getCurrentPosition(async (p) => {
-            const desc = prompt("Nature du problème (ex: Tas d'ordures) :");
-            if (!desc) return;
+            const msg = prompt("DESCRIPTION DE L'INSALUBRITÉ :");
+            if (!msg) return;
             await addDoc(collection(db, "signalements"), {
-                description: desc, latitude: p.coords.latitude, longitude: p.coords.longitude,
-                userId: userKey, timestamp: serverTimestamp()
+                description: msg, latitude: p.coords.latitude, longitude: p.coords.longitude,
+                userId: uID, timestamp: serverTimestamp()
             });
-        }, () => alert("Veuillez activer le GPS"), { enableHighAccuracy: true });
+        }, () => alert("GPS REQUIS"), { enableHighAccuracy: true });
     };
 
-    window.sup = async (id) => { if(confirm("Supprimer votre signalement ?")) await deleteDoc(doc(db, "signalements", id)); };
-    window.mod = async (id, old) => { 
-        const n = prompt("Nouvelle description :", old);
-        if(n && n !== old) await updateDoc(doc(db, "signalements", id), { description: n });
+    window.abort = async (id) => {
+        if (confirm("CONFIRMER LA SUPPRESSION DU SIGNALEMENT ?")) {
+            await deleteDoc(doc(db, "signalements", id));
+        }
     };
 </script>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>
