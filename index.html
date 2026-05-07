@@ -60,7 +60,6 @@
                 const d = doc.data();
                 const id = doc.id;
                 
-                // FILTRE CHIRURGICAL : On ignore les anciens points de test approximatifs
                 if(d.latitude && d.longitude && d.latitude !== 6.1319) {
                     let popupContent = `<b>${d.description}</b>`;
                     if(d.photo) popupContent += `<br><img src="${d.photo}" style="width:150px;margin-top:5px;border-radius:4px">`;
@@ -108,7 +107,10 @@
 
             const watchId = navigator.geolocation.watchPosition((p) => {
                 navigator.geolocation.clearWatch(watchId);
-                envoyer(txt, p.coords.latitude, p.coords.longitude, photoData);
+                const lat = p.coords.latitude;
+                const lng = p.coords.longitude;
+                map.flyTo([lat, lng], 17, { animate: true, duration: 1.5 });
+                envoyer(txt, lat, lng, photoData);
             }, (err) => {
                 navigator.geolocation.clearWatch(watchId);
             }, gpsOptions);
