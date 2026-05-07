@@ -59,7 +59,9 @@
             snap.forEach((doc) => {
                 const d = doc.data();
                 const id = doc.id;
-                if(d.latitude && d.longitude) {
+                
+                // FILTRE CHIRURGICAL : On ignore les anciens points de test approximatifs
+                if(d.latitude && d.longitude && d.latitude !== 6.1319) {
                     let popupContent = `<b>${d.description}</b>`;
                     if(d.photo) popupContent += `<br><img src="${d.photo}" style="width:150px;margin-top:5px;border-radius:4px">`;
                     
