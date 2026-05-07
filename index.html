@@ -3,42 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>URBAN-CLEAN PRO | Lomé</title>
+    <title>URBAN-CLEAN SIG | Lomé</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background: #f0f2f5; }
+        body { font-family: 'Segoe UI', serif; margin: 0; background: #f0f2f5; overflow: hidden; }
         #main-app { display: flex; flex-direction: column; height: 100vh; }
+        header { background: #1b5e20; color: white; padding: 12px; text-align: center; font-weight: bold; z-index: 1000; }
         
-        header { background: #1b5e20; color: white; padding: 15px; text-align: center; font-weight: bold; box-shadow: 0 2px 10px rgba(0,0,0,0.3); z-index: 1000; }
-        
-        #map { flex: 1; width: 100%; background: #ddd; } /* Fond gris si chargement lent */
+        /* Conteneur de carte avec fond de secours */
+        #map { flex: 1; width: 100%; background: #e0e0e0; position: relative; }
 
-        #controls { padding: 15px; background: white; border-top: 3px solid #1b5e20; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); }
+        #controls { padding: 15px; background: white; border-top: 3px solid #1b5e20; z-index: 1001; }
+        .btn-signal { background: #d32f2f; color: white; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; font-size: 1em; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
         
-        .btn-signal { background: #d32f2f; color: white; border: none; padding: 12px; width: 100%; border-radius: 25px; font-weight: bold; font-size: 1.1em; cursor: pointer; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
-        
-        .stat-bar { display: flex; justify-content: space-between; align-items: center; background: #e8f5e9; padding: 10px; border-radius: 8px; margin-top: 10px; border-left: 5px solid #1b5e20; }
-        
-        #alert-feed { max-height: 150px; overflow-y: auto; margin-top: 10px; font-size: 0.85em; }
-        .item { padding: 8px; border-bottom: 1px solid #eee; }
+        .stat-bar { display: flex; justify-content: space-between; background: #e8f5e9; padding: 10px; border-radius: 5px; margin-top: 10px; border-left: 5px solid #1b5e20; }
+        #alert-feed { max-height: 100px; overflow-y: auto; margin-top: 10px; font-size: 0.85em; border-top: 1px solid #eee; }
     </style>
 </head>
 <body>
 
 <div id="main-app">
     <header>URBAN-CLEAN : Observatoire de Lomé</header>
-    
     <div id="map"></div>
-
     <div id="controls">
         <button class="btn-signal" onclick="localiserEtSignaler()">🚨 SIGNALER UNE INSALUBRITÉ</button>
-        
         <div class="stat-bar">
             <span>Points identifiés :</span>
             <strong id="counter">0</strong>
         </div>
-
-        <div id="alert-feed">Attente de données...</div>
+        <div id="alert-feed">Chargement du flux...</div>
     </div>
 </div>
 
@@ -58,19 +51,22 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Initialisation forcée de la carte
-    var map = L.map('map', { zoomControl: true }).setView([6.1319, 1.2228], 13);
+    // Initialisation robuste de la carte
+    var map = L.map('map').setView([6.1319, 1.2228], 13);
     
-    // Correction pour l'affichage des tuiles
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '© OpenStreetMap'
     }).addTo(map);
 
-    // Forcer le redimensionnement pour éviter l'écran gris
-    setTimeout(() => { map.invalidateSize(); }, 500);
+    // ACTION CRUCIALE : Force le chargement des tuiles toutes les 200ms au début
+    let fixCount = 0;
+    const fixMap = setInterval(() => {
+        map.invalidateSize();
+        fixCount++;
+        if (fixCount > 10) clearInterval(fixMap);
+    }, 200);
 
-    // Écoute en temps réel
     onSnapshot(collection(db, "signalements"), (snapshot) => {
         const feed = document.getElementById('alert-feed');
         const counter = document.getElementById('counter');
@@ -81,48 +77,33 @@
             const data = doc.data();
             count++;
             
-            // On s'assure que les coordonnées sont des nombres
-            const lat = parseFloat(data.latitude);
-            const lng = parseFloat(data.longitude);
+            // Sécurité contre le NaN : on force la conversion et on gère l'absence
+            const lat = parseFloat(data.latitude) || 6.1319;
+            const lng = parseFloat(data.longitude) || 1.2228;
 
-            if (!isNaN(lat) && !isNaN(lng)) {
-                L.marker([lat, lng]).addTo(map)
-                 .bindPopup(`<b>Signalement</b><br>${data.description || 'Non défini'}`);
-            }
+            L.marker([lat, lng]).addTo(map);
 
             const div = document.createElement('div');
-            div.className = 'item';
-            div.innerHTML = `📍 <b>${data.description || 'Alerte'}</b> (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
+            div.style.padding = "5px";
+            div.innerHTML = `📍 ${data.description || 'Alerte'} (${lat.toFixed(3)}, ${lng.toFixed(3)})`;
             feed.prepend(div);
         });
         counter.innerText = count;
     });
 
-    // FONCTION D'INTERACTION : Signalement direct
     window.localiserEtSignaler = function() {
-        if (!confirm("Voulez-vous signaler une insalubrité à votre position actuelle ?")) return;
-
         navigator.geolocation.getCurrentPosition(async (pos) => {
-            const desc = prompt("Décrivez brièvement le problème (ex: Tas d'ordures) :");
+            const desc = prompt("Type d'insalubrité :");
             if (!desc) return;
-
-            try {
-                await addDoc(collection(db, "signalements"), {
-                    description: desc,
-                    latitude: pos.coords.latitude,
-                    longitude: pos.coords.longitude,
-                    timestamp: serverTimestamp()
-                });
-                alert("Merci ! Signalement enregistré sur la carte de Lomé.");
-            } catch (e) {
-                alert("Erreur lors de l'envoi.");
-            }
-        }, () => {
-            alert("Veuillez activer votre GPS.");
+            await addDoc(collection(db, "signalements"), {
+                description: desc,
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+                timestamp: serverTimestamp()
+            });
         });
     }
 </script>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>
