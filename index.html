@@ -55,16 +55,25 @@
             feed.innerHTML = "";
             Object.values(markerPool).forEach(m => map.removeLayer(m));
             markerPool = {};
-
             snap.forEach((doc) => {
                 const d = doc.data();
                 const id = doc.id;
+                // Nettoyage automatique des points de test orphelins (6.1319)
                 if(d.latitude && d.longitude && d.latitude !== 6.1319) {
                     let popupContent = `<b>${d.description}</b>`;
                     if(d.photo) popupContent += `<br><img src="${d.photo}" style="width:150px;margin-top:5px;border-radius:4px">`;
                     markerPool[id] = L.marker([d.latitude, d.longitude]).addTo(map).bindPopup(popupContent);
                     const isMine = (d.userId === myKey);
-                    feed.innerHTML += `<div class="data-card"><div style="display:flex;align-items:center;flex:1">${d.photo ? `<img src="${d.photo}" class="thumb">` : ''}<div><strong>${d.description}</strong><br><small>Coord: ${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}</small></div></div><div class="actions">${isMine ? `<i class="fas fa-edit" onclick="editer('${id}', '${d.description}')"></i><i class="fas fa-trash" onclick="supprimer('${id}')"></i>` : ''}</div></div>`;
+                    feed.innerHTML += `
+                        <div class="data-card">
+                            <div style="display:flex;align-items:center;flex:1">
+                                ${d.photo ? `<img src="${d.photo}" class="thumb">` : ''}
+                                <div><strong>${d.description}</strong><br><small>Coord: ${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}</small></div>
+                            </div>
+                            <div class="actions">
+                                ${isMine ? `<i class="fas fa-edit" onclick="editer('${id}', '${d.description}')"></i><i class="fas fa-trash" onclick="supprimer('${id}')"></i>` : ''}
+                            </div>
+                        </div>`;
                 }
             });
         });
@@ -73,7 +82,7 @@
             const txt = prompt("Nature de l'urgence d'assainissement :");
             if(!txt) return;
 
-            // Déclenchement immédiat pour éviter le freeze de Chrome
+            // 1. Capture immédiate de la position (avant que Chrome ne suspende le script)
             const gpsOptions = { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 };
             if (navigator.permissions && navigator.permissions.query) await navigator.permissions.query({ name: 'geolocation' }).catch(() => {});
 
@@ -81,18 +90,21 @@
                 const lat = p.coords.latitude;
                 const lng = p.coords.longitude;
                 
+                // 2. Centrage fluide immédiat
+                map.flyTo([lat, lng], 17, { animate: true, duration: 1.5 });
+
+                // 3. Ouverture de la caméra
                 const photoInput = document.getElementById('photoInput');
                 photoInput.onchange = e => {
                     const file = e.target.files[0];
                     const reader = new FileReader();
-                    reader.onload = () => {
-                        map.flyTo([lat, lng], 17, { animate: true, duration: 1.5 });
-                        envoyer(txt, lat, lng, reader.result);
-                    };
-                    if(file) reader.readAsDataURL(file);
+                    reader.onload = () => envoyer(txt, lat, lng, reader.result);
+                    if(file) reader.readAsDataURL(file); else envoyer(txt, lat, lng, null);
                 };
                 photoInput.click();
-            }, () => { alert("Erreur GPS Chrome : Vérifiez vos autorisations."); }, gpsOptions);
+            }, (err) => {
+                alert("Erreur Chrome : Assurez-vous d'avoir activé le GPS de l'appareil.");
+            }, gpsOptions);
         }
 
         function envoyer(desc, lat, lng, photo) {
@@ -107,7 +119,6 @@
             const n = prompt("Modifier la description :", old);
             if(n && n !== old) db.collection("signalements").doc(id).update({ description: n });
         };
-
         setTimeout(() => map.invalidateSize(), 1000);
     </script>
 </body>
