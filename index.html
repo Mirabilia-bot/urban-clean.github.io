@@ -59,61 +59,40 @@
             snap.forEach((doc) => {
                 const d = doc.data();
                 const id = doc.id;
-                
                 if(d.latitude && d.longitude && d.latitude !== 6.1319) {
                     let popupContent = `<b>${d.description}</b>`;
                     if(d.photo) popupContent += `<br><img src="${d.photo}" style="width:150px;margin-top:5px;border-radius:4px">`;
-                    
                     markerPool[id] = L.marker([d.latitude, d.longitude]).addTo(map).bindPopup(popupContent);
                     const isMine = (d.userId === myKey);
-                    feed.innerHTML += `
-                        <div class="data-card">
-                            <div style="display:flex;align-items:center;flex:1">
-                                ${d.photo ? `<img src="${d.photo}" class="thumb">` : ''}
-                                <div><strong>${d.description}</strong><br><small>Coord: ${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}</small></div>
-                            </div>
-                            <div class="actions">
-                                ${isMine ? `<i class="fas fa-edit" onclick="editer('${id}', '${d.description}')"></i>
-                                           <i class="fas fa-trash" onclick="supprimer('${id}')"></i>` : ''}
-                            </div>
-                        </div>`;
+                    feed.innerHTML += `<div class="data-card"><div style="display:flex;align-items:center;flex:1">${d.photo ? `<img src="${d.photo}" class="thumb">` : ''}<div><strong>${d.description}</strong><br><small>Coord: ${d.latitude.toFixed(5)}, ${d.longitude.toFixed(5)}</small></div></div><div class="actions">${isMine ? `<i class="fas fa-edit" onclick="editer('${id}', '${d.description}')"></i><i class="fas fa-trash" onclick="supprimer('${id}')"></i>` : ''}</div></div>`;
                 }
             });
         });
 
-        function lancerSignalement() {
+        async function lancerSignalement() {
             const txt = prompt("Nature de l'urgence d'assainissement :");
             if(!txt) return;
 
-            const photoInput = document.getElementById('photoInput');
-            photoInput.onchange = e => {
-                const file = e.target.files[0];
-                const reader = new FileReader();
-                reader.onload = () => {
-                    const base64Photo = reader.result;
-                    obtenirPosition(txt, base64Photo);
-                };
-                if(file) reader.readAsDataURL(file); else obtenirPosition(txt, null);
-            };
-            photoInput.click();
-        }
-
-        async function obtenirPosition(txt, photoData) {
+            // Déclenchement immédiat pour éviter le freeze de Chrome
             const gpsOptions = { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 };
-            
-            if (navigator.permissions && navigator.permissions.query) {
-                await navigator.permissions.query({ name: 'geolocation' }).catch(() => {});
-            }
+            if (navigator.permissions && navigator.permissions.query) await navigator.permissions.query({ name: 'geolocation' }).catch(() => {});
 
-            const watchId = navigator.geolocation.watchPosition((p) => {
-                navigator.geolocation.clearWatch(watchId);
+            navigator.geolocation.getCurrentPosition((p) => {
                 const lat = p.coords.latitude;
                 const lng = p.coords.longitude;
-                map.flyTo([lat, lng], 17, { animate: true, duration: 1.5 });
-                envoyer(txt, lat, lng, photoData);
-            }, (err) => {
-                navigator.geolocation.clearWatch(watchId);
-            }, gpsOptions);
+                
+                const photoInput = document.getElementById('photoInput');
+                photoInput.onchange = e => {
+                    const file = e.target.files[0];
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        map.flyTo([lat, lng], 17, { animate: true, duration: 1.5 });
+                        envoyer(txt, lat, lng, reader.result);
+                    };
+                    if(file) reader.readAsDataURL(file);
+                };
+                photoInput.click();
+            }, () => { alert("Erreur GPS Chrome : Vérifiez vos autorisations."); }, gpsOptions);
         }
 
         function envoyer(desc, lat, lng, photo) {
