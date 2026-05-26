@@ -352,6 +352,7 @@
     const ADMIN_EMAILS = ["mirabiliagnimdou@gmail.com", "kgmexpertise@gmail.com"];
 
     fetch('./communes.geojson')
+        fetch('./communes.geojson')
         .then(res => {
             if (!res.ok) throw new Error("Erreur");
             return res.json();
@@ -362,28 +363,29 @@
                 onEachFeature: (f, l) => {
                     let nom = f.properties["Noms des communes"] || f.properties["Nom_Commune"] || f.properties["nom"]; 
                     
-                    // CALCUL VECTORIEL AVEC TURF.JS
+                    // CALCUL VECTORIEL GÉOSPATIAL AVEC TURF.JS
                     let superficieKm2 = 0;
                     let perimetreKm = 0;
                     try {
                         if (f.geometry) {
                             superficieKm2 = turf.area(f) / 1000000; // Conversion m² en km²
-                            perimetreKm = turf.length(f, {units: 'kilometers'});
+                            perimetreKm = turf.length(f, {units: 'kilometers'}); // Calcul du périmètre linéaire
                         }
                     } catch(err) {
                         console.error("Erreur de calcul métrique:", err);
                     }
 
+                    // CORRECTIF CHIRURGICAL : interactive: false empêche le texte de bloquer le clic sur le polygone
                     if(nom) {
-                        l.bindTooltip(nom, { permanent: true, direction: "center", className: "commune-label" });
+                        l.bindTooltip(nom, { permanent: true, direction: "center", className: "commune-label", interactive: false });
                     }
 
-                    // INJECTION STRUCTURÉE ET PROPRE DANS LA POPUP DE LA COLLECTIVITÉ
-                    let popupCommune = `<div style="font-family:'Montserrat',sans-serif; min-width:200px;">
-                        <h4 style="margin:0 0 5px 0; color:var(--kgm-blue); text-transform:uppercase;">${escapeHtml(nom)}</h4>
+                    // INJECTION ET AFFICHAGE DYNAMIQUE DU PÉRIMÈTRE ET DE LA SUPERFICIE
+                    let popupCommune = `<div style="font-family:'Montserrat',sans-serif; min-width:220px; padding:5px;">
+                        <h4 style="margin:0 0 5px 0; color:var(--kgm-blue); text-transform:uppercase; font-weight:700;">${escapeHtml(nom)}</h4>
                         <hr style="border:none; border-top:1px solid #eee; margin:5px 0;">
-                        <i class="fas fa-chart-area" style="color:var(--kgm-green)"></i> <b>Superficie :</b> ${superficieKm2.toFixed(2)} km²<br>
-                        <i class="fas fa-vector-square" style="color:var(--kgm-blue)"></i> <b>Périmètre :</b> ${perimetreKm.toFixed(2)} km
+                        <p style="margin:5px 0; font-size:13px;"><i class="fas fa-chart-area" style="color:var(--kgm-green); width:20px;"></i> <b>Superficie :</b> ${superficieKm2.toFixed(2)} km²</p>
+                        <p style="margin:5px 0; font-size:13px;"><i class="fas fa-vector-square" style="color:var(--kgm-blue); width:20px;"></i> <b>Périmètre :</b> ${perimetreKm.toFixed(2)} km</p>
                     </div>`;
                     l.bindPopup(popupCommune);
                 }
