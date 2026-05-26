@@ -27,6 +27,13 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
   
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+  
+  <script src="https://leaflet.github.io/Leaflet.heat/dist/leaflet-heat.js"></script>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -89,7 +96,6 @@
     #flash-msg { position: fixed; top: 85px; left: 50%; transform: translateX(-50%); z-index: 5000; background: var(--kgm-green); color: white; padding: 10px 20px; border-radius: 50px; font-weight: bold; box-shadow: 0 12px 30px rgba(0,0,0,0.22); display: none; animation: fadeInDown 0.5s; backdrop-filter: blur(12px); }
     @keyframes fadeInDown { from { opacity: 0; top: 50px; } to { opacity: 1; top: 85px; } }
 
-    /* STYLES AJOUTÉS POUR LES OPTIONS DE SUIVI DANS LE MENU */
     .menu-section-title { padding: 10px 25px 5px 25px; color: rgba(255,255,255,0.6); font-size: 11px; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; border-top: 1px solid rgba(255,255,255,0.05); margin-top: 5px; }
     .menu-filter-select { width: 80%; margin: 5px 10%; padding: 8px; border-radius: 5px; border: none; background: rgba(255,255,255,0.15); color: white; font-family: 'Montserrat', sans-serif; font-size: 12px; font-weight: bold; outline: none; cursor: pointer; }
     .menu-filter-select option { background: var(--kgm-blue); color: white; }
@@ -98,10 +104,8 @@
     .status-badge.cours { background: #fd7e14; }
     .status-badge.resolu { background: #28a745; }
     
-    /* STYLE APPLIQUÉ SUR LE SELECT DE STATUT DANS LES POPUPS POUR LES EXPERTS */
     .popup-status-select { margin-top: 5px; padding: 3px 6px; font-size: 11px; font-family: 'Montserrat', sans-serif; font-weight: bold; border-radius: 4px; border: 1px solid #ccc; outline: none; color: #333; }
 
-    /* INTERVENTIONS CHIRURGICALES DE RESPONSIVITÉ COMPLÈTE (TOUS ÉCRANS) */
     @media (max-width: 400px) {
         header h1 { font-size: 0.8em; width: 50%; margin-left: -55px; }
         header p { font-size: 0.65em; width: 50%; margin-left: -55px; }
@@ -116,7 +120,6 @@
         .ui-controls { bottom: 25px; left: 50%; transform: translateX(-50%); }
         @keyframes slideUp { from { bottom: 0px; opacity: 0; } to { bottom: 25px; opacity: 1; } }
     }
-        /* --- BLOC CHIRURGICAL POUR LE NAVIGATEUR FACEBOOK --- */
         #map {
             touch-action: none !important;
             -webkit-tap-highlight-color: transparent;
@@ -130,7 +133,6 @@
             -ms-user-select: none;
             user-select: none;
         }
-  
   </style>
   <script type="application/ld-json">
 {
@@ -166,7 +168,6 @@
   }
 }
   </script>
-  
 </head>
 <body>
 
@@ -276,7 +277,7 @@
         </select>
         <input type="text" id="autreQuartier" placeholder="Nom du quartier" style="display:none; width:100%; padding:10px; margin-bottom:10px;">
         
-        <<label style="font-weight:bold; font-size:14px;">Description</label>
+        <label style="font-weight:bold; font-size:14px;">Description</label>
         <textarea id="descInput" placeholder="Détails du problème..." style="width:100%; padding:10px; margin:5px 0 10px 0; font-family: 'Montserrat', sans-serif; height:60px;"></textarea>
 
         <div style="display:flex; gap:10px;">
@@ -318,8 +319,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script>
     const firebaseConfig = {
       apiKey: "AIzaSyAsA9pypTsCogmSq_OdDXr5KPAgVi4ncm4",
@@ -343,16 +343,16 @@
     var userPos = null;
     var userCircle = null;
     var data = [];
-    var currentFilterStatus = "tous"; // Variable de suivi globale pour les filtres
+    var currentFilterStatus = "tous"; 
     var markers = L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50 }).addTo(map);
-    var activeBufferLayer = null; // Variable globale pour suivre la zone tampon active
+    var activeBufferLayer = null; // Suivi de la zone tampon active
+    var coucheHeatmapSpatiale = null; // Suivi de la heatmap
+    var objetMoteurIA = null; // Modèle TensorFlow COCO-SSD
     var chart1, chart2;
 
-    // DEFINITION ULTRA-FIABLE ET SECURISEE DES ROLES GESTIONNAIRES (MAIRIE / ADMIN KGM EXPERTISE)
     const ADMIN_EMAILS = ["mirabiliagnimdou@gmail.com", "kgmexpertise@gmail.com"];
 
     fetch('./communes.geojson')
-        fetch('./communes.geojson')
         .then(res => {
             if (!res.ok) throw new Error("Erreur");
             return res.json();
@@ -368,19 +368,18 @@
                     let perimetreKm = 0;
                     try {
                         if (f.geometry) {
-                            superficieKm2 = turf.area(f) / 1000000; // Conversion m² en km²
-                            perimetreKm = turf.length(f, {units: 'kilometers'}); // Calcul du périmètre linéaire
+                            superficieKm2 = turf.area(f) / 1000000; 
+                            perimetreKm = turf.length(f, {units: 'kilometers'});
                         }
                     } catch(err) {
                         console.error("Erreur de calcul métrique:", err);
                     }
 
-                    // CORRECTIF CHIRURGICAL : interactive: false empêche le texte de bloquer le clic sur le polygone
+                    // LE INTERACTIVE: FALSE PERMET DE PASSER AU TRAVERS DU TEXTE POUR CLIQUER LE POLYGONE
                     if(nom) {
                         l.bindTooltip(nom, { permanent: true, direction: "center", className: "commune-label", interactive: false });
                     }
 
-                    // INJECTION ET AFFICHAGE DYNAMIQUE DU PÉRIMÈTRE ET DE LA SUPERFICIE
                     let popupCommune = `<div style="font-family:'Montserrat',sans-serif; min-width:220px; padding:5px;">
                         <h4 style="margin:0 0 5px 0; color:var(--kgm-blue); text-transform:uppercase; font-weight:700;">${escapeHtml(nom)}</h4>
                         <hr style="border:none; border-top:1px solid #eee; margin:5px 0;">
@@ -495,20 +494,16 @@
     return L.divIcon({ html: htmlIcons[type] || htmlIcons.dechets, className: 'c-icon', iconSize: [34, 34], iconAnchor: [17, 17] });
 };
 
-
-    /* PROTECTION XSS : échappement des données utilisateur avant injection HTML */
     function escapeHtml(str) {
         if (!str) return '';
         return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
 
-    /* FONCTION DE FILTRAGE ASSOCIEE AU SELECT DU MENU */
     function filtrerStatutSurCarte(statut) {
         currentFilterStatus = statut;
         refresh();
     }
 
-    // FONCTION CHIRURGICALE POUR LA MISE A JOUR PARTIELLE DU STATUT BY UN EXPERT / MAIRIE
     async function changerStatutDirect(docId, nouveauStatut) {
         document.getElementById('loadingOverlay').style.display = 'flex';
         try {
@@ -525,21 +520,17 @@
         let counts = {dechets:0, pollution:0, securite:0};
         let qCounts = {};
         
-        // Dictionnaire des labels de statuts pour injection claire dans la popup
         const statusLabels = {
             "attente": "<span class='status-badge attente'>⏳ En attente</span>",
             "cours": "<span class='status-badge cours'>⚙️ En cours</span>",
             "resolu": "<span class='status-badge resolu'>✅ Résolu</span>"
         };
 
-        // Verification du role administratif de l'utilisateur connecte
         let estGestionnaire = currentUser && ADMIN_EMAILS.includes(currentUser.email);
 
         data.forEach(d => {
-            // Initialisation rétrocompatible du statut s'il n'existe pas en BDD
             let itemStatus = d.status || "attente";
 
-            // Application chirurgicale du filtre dynamique sélectionné
             if (currentFilterStatus !== "tous") {
                 if (currentFilterStatus === "mes_signalements") {
                     if (!currentUser || d.userId !== currentUser.uid) return;
@@ -550,7 +541,6 @@
 
             let popupContent = `<div style="min-width:180px;"><b style="color:var(--kgm-blue)">${escapeHtml(d.quartier)}</b><br><i>${escapeHtml(d.desc)}</i><br>`;
             
-            // INCORPORATION CELLULAIRE DE L'INTERFACE D'ACTION RESERVEE COMPTE GESTIONNAIRE VS VISU CITOYENNE
             if (estGestionnaire) {
                 popupContent += `Suivi : <select class="popup-status-select" onchange="changerStatutDirect('${d.id}', this.value)">
                     <option value="attente" ${itemStatus === 'attente' ? 'selected' : ''}>⏳ En attente</option>
@@ -572,17 +562,16 @@
             if(d.lat && d.lng) {
                 let markerElement = L.marker([d.lat, d.lng], {icon: getDynamicIcon(d.type, itemStatus)});
                 
-                // INTERACTION GÉOSPATIALE : Génération de la Zone Tampon (Buffer de 150m) lors du clic
                 markerElement.on('click', () => {
                     if(activeBufferLayer) map.removeLayer(activeBufferLayer);
                     try {
                         let pointGeojson = turf.point([d.lng, d.lat]);
-                        let bufferGeojson = turf.buffer(pointGeojson, 0.15, {units: 'kilometers'}); // Rayon de 150m
+                        let bufferGeojson = turf.buffer(pointGeojson, 0.15, {units: 'kilometers'}); // Rayon de 150m (0.15km)
                         activeBufferLayer = L.geoJSON(bufferGeojson, {
-                            style: { color: "#fc3d21", weight: 1, fillColor: "#fc3d21", fillOpacity: 0.20, dashArray: "4, 4" }
+                            style: { color: "#fc3d21", weight: 1, fillColor: "#fc3d21", fillOpacity: 0.18, dashArray: "4, 4" }
                         }).addTo(map);
                     } catch(err) {
-                        console.error("Erreur lors de la génération du Buffer Turf:", err);
+                        console.error("Erreur Buffer Turf.js:", err);
                     }
                 });
 
@@ -593,6 +582,7 @@
         });
         document.getElementById('stats-text').innerText = `${data.length} signalements correspondants`;
         updateCharts(counts, qCounts);
+        actualiserHeatmapIntelligente(); // Recalcul et affichage des points chauds
     }
 
     function supprimerDoc(id) { if(confirm("Supprimer ?")) db.collection('signalements').doc(id).delete(); }
@@ -626,7 +616,7 @@
         document.getElementById('dateInput').value = d.date;
         document.getElementById('heureInput').value = d.heure;
         document.getElementById('typeSelect').value = d.type;
-        document.getElementById('statusSelect').value = d.status || "attente"; // Chargement du statut en mode édition
+        document.getElementById('statusSelect').value = d.status || "attente"; 
         document.getElementById('modalForm').style.display = 'flex';
         map.closePopup();
     }
@@ -641,8 +631,6 @@
         }
     }
 
-    /* CORRECTIF CHIRURGICAL : POSITION AVEC POPUP REFERMABLE */
-    /* STRATÉGIE LOCALISATION : réseau rapide d'abord (~2-3s), GPS précis en fallback */
     var localisationPrecise = false;
 
     function lancerLocalisation() {
@@ -662,7 +650,6 @@
 
     map.on('locationerror', (e) => {
         if (!localisationPrecise) {
-            /* Échec réseau rapide → on retente avec GPS précis */
             localisationPrecise = true;
             showFlash('📍 Tentative GPS précis…');
             map.locate({ enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
@@ -670,21 +657,6 @@
             showFlash("⚠️ Localisation indisponible (code " + e.code + "). Vérifiez les permissions GPS.");
         }
     });
-
-       function ouvrirModal() { 
-        lancerLocalisation();
-        document.getElementById('editId').value = "";
-        document.getElementById('quartierSelect').value = "";
-        document.getElementById('autreQuartier').style.display = 'none';
-        document.getElementById('autreQuartier').value = "";
-        document.getElementById('descInput').value = "";
-        document.getElementById('statusSelect').value = "attente"; 
-        
-        document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
-        document.getElementById('heureInput').value = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        
-        document.getElementById('modalForm').style.display = 'flex';
-    }
 
     function fermerModal() { document.getElementById('modalForm').style.display='none'; }
     function checkAutre(v) { document.getElementById('autreQuartier').style.display = (v==='Autres'?'block':'none'); }
@@ -727,9 +699,19 @@
                 let formData = new FormData(); formData.append("image", compressedBlob);
                 const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, { method: "POST", body: formData });
                 const imgData = await res.json(); photoUrl = imgData.data.url;
+                
+                // ANALYSE EN COUPLAGE AVEC LE MOTEUR IA TENSORFLOW SI DISPONIBLE
+                if(objetMoteurIA) {
+                    const tempImg = new Image();
+                    tempImg.src = photoUrl;
+                    tempImg.crossOrigin = "anonymous";
+                    tempImg.onload = async () => {
+                        const predictions = await objetMoteurIA.detect(tempImg);
+                        console.log("Objets détectés automatiquement par l'IA :", predictions);
+                    };
+                }
             }
             
-            // Isolation de la structure de mise à jour pour garantir la préservation des métadonnées initiales du citoyen
             if(!editId) {
                 const signalementData = { 
                     quartier: q, 
@@ -737,7 +719,7 @@
                     desc: document.getElementById('descInput').value, 
                     date: document.getElementById('dateInput').value, 
                     heure: document.getElementById('heureInput').value, 
-                    status: "attente", // Forçage strict à la création du signalement citoyen
+                    status: "attente", 
                     photo: photoUrl, 
                     userId: currentUser.uid,
                     lat: userPos.lat,
@@ -745,7 +727,6 @@
                 };
                 await db.collection('signalements').add(signalementData);
             } else {
-                // Modification par le citoyen : le champ status est exclu pour éviter toute corruption ou fraude
                 const updateData = {
                     quartier: q,
                     type: document.getElementById('typeSelect').value,
@@ -765,7 +746,6 @@
     function togglePanel(id) { document.querySelectorAll('.panel').forEach(p => p.id === id ? p.classList.toggle('active') : p.classList.remove('active')); }
     function effacerPhotoSelectionnee() { document.getElementById('photoInput').value = ""; }
 
-    /* MICRO INTERACTIONS PREMIUM */
     document.querySelectorAll('.ui-btn').forEach(btn => {
         btn.addEventListener('mouseenter', () => {
             btn.style.transition = 'all 0.25s ease';
@@ -780,6 +760,56 @@
         });
         map.invalidateSize();
     });
+
+    // =========================================================================
+    // MODULE GÉOSPATIAL AVANCÉ & ENGIN D'INTELLIGENCE ARTIFICIELLE (TENSORFLOW)
+    // =========================================================================
+    
+    function actualiserHeatmapIntelligente() {
+        if (coucheHeatmapSpatiale) map.removeLayer(coucheHeatmapSpatiale);
+        let pointsChauds = [];
+        data.forEach(d => {
+            let itemStatus = d.status || "attente";
+            if (currentFilterStatus !== "tous" && itemStatus !== currentFilterStatus) return;
+            if (d.lat && d.lng) {
+                let poidsIntensite = d.type === 'dechets' ? 1.5 : 1.0;
+                pointsChauds.push([d.lat, d.lng, poidsIntensite]);
+            }
+        });
+        coucheHeatmapSpatiale = L.heatLayer(pointsChauds, {
+            radius: 30,
+            blur: 18,
+            maxZoom: 16,
+            gradient: { 0.4: '#1b5e20', 0.65: '#f57c00', 1.0: '#fc3d21' }
+        }).addTo(map);
+    }
+
+    async function initialiserMoteurIA() {
+        console.log("KGM AI Engine: Initialisation de TensorFlow.js...");
+        try {
+            objetMoteurIA = await cocoSsd.load();
+            console.log("KGM AI Engine: Modèle COCO-SSD chargé pour l'analyse environnementale.");
+        } catch (error) {
+            console.error("Erreur d'initialisation du modèle IA:", error);
+        }
+    }
+
+    initialiserMoteurIA();
+
+    function ouvrirModal() { 
+        lancerLocalisation();
+        document.getElementById('editId').value = "";
+        document.getElementById('quartierSelect').value = "";
+        document.getElementById('autreQuartier').style.display = 'none';
+        document.getElementById('autreQuartier').value = "";
+        document.getElementById('descInput').value = "";
+        document.getElementById('statusSelect').value = "attente"; 
+        
+        document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+        document.getElementById('heureInput').value = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        
+        document.getElementById('modalForm').style.display = 'flex';
+    }
 </script>
 </body>
 </html>
