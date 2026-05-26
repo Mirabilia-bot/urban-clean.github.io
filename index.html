@@ -671,16 +671,27 @@
 
    function abrirModal() { 
         lancerLocalisation();
-        document.getElementById('editId').value = "";
-        document.getElementById('quartierSelect').value = "";
-        document.getElementById('autreQuartier').style.display = 'none';
-        document.getElementById('autreQuartier').value = "";
-        document.getElementById('modalForm').style.display='flex';
-        document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
-        document.getElementById('heureInput').value = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        document.getElementById('descInput').value = "";
-        document.getElementById('statusSelect').value = "attente"; // Valeur par défaut lors de la création d'un signalement
-    }
+        // CORRECTION CHIRURGICALE : Renommage en ouvrirModal + Ouverture immédiate asynchrone
+function ouvrirModal() { 
+    // On lance la recherche de position en tâche de fond sans bloquer l'UI
+    lancerLocalisation();
+    
+    // Réinitialisation parfaite des champs du formulaire
+    document.getElementById('editId').value = "";
+    document.getElementById('quartierSelect').value = "";
+    document.getElementById('autreQuartier').style.display = 'none';
+    document.getElementById('autreQuartier').value = "";
+    document.getElementById('descInput').value = "";
+    document.getElementById('statusSelect').value = "attente"; 
+    
+    // Configuration des constantes temporelles
+    document.getElementById('dateInput').value = new Date().toISOString().split('T')[0];
+    document.getElementById('heureInput').value = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    
+    // Affichage instantané de l'interface de signalement
+    document.getElementById('modalForm').style.display = 'flex';
+}
+
     function fermerModal() { document.getElementById('modalForm').style.display='none'; }
     function checkAutre(v) { document.getElementById('autreQuartier').style.display = (v==='Autres'?'block':'none'); }
 
